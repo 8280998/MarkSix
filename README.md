@@ -1,156 +1,99 @@
-# 香港六合彩预测项目（V1 骨架）
+# 本地 Python 版（零第三方依赖）
 
-## 功能范围（当前版本）
-- 一次性历史初始化：从 `Mark_Six.csv` 导入历史开奖
-- 自动增量更新：通过 Vercel Cron 调用 `/api/jobs/sync-latest` 同步最新期
-- 多策略预测：`balanced_v1`（默认）、`hot_v1`、`cold_rebound_v1`、`momentum_v1`
-- 开奖复盘：自动计算每个策略命中号码、命中数和命中率
-- 历史补录：支持按年份区间导入更早 CSV（例如 1993-2007）
-- 数据审计：检查号码合法性、期号连续性、时间顺序
+脚本：`marksix_local.py`
 
-## 本地启动
-1. 安装依赖
+## 环境
+- Python 3.10+
+- 不需要 `pip install`
+
+## 快速开始
+在项目根目录执行：
+
 ```bash
-npm install
+# 1) 首次导入 Mark_Six.csv 并生成下一期预测
+python3 marksix_local.py bootstrap --csv Mark_Six.csv
+
+# 2) 查看当前摘要（最新开奖、待复盘预测、策略统计）
+python3 marksix_local.py show
+
+# 3) 当你更新 CSV 后，增量同步 + 复盘 + 生成新预测
+python3 marksix_local.py sync --csv Mark_Six.csv
+
+# 4) 快捷更新官方数据
+python3 marksix_local.py --update
+
+# 5) 指定第三方数据源（官方失败时可切换）
+python3 marksix_local.py --update --source third_party --third-party-url "https://example.com/marksix.json"
+
+# 6) 多第三方回退（可重复传参）
+python3 marksix_local.py --update --source auto \\
+  --third-party-url "https://source-a.example/marksix.json" \\
+  --third-party-url "https://source-b.example/marksix.csv"
+
+# 7) Lottolyzer 分页抓取页数（默认 60 页）
+python3 marksix_local.py --update --source auto --third-party-max-pages 60
 ```
 
-2. 配置环境变量
+说明：预测结果为 `6+1`（6 个主号 + 1 个特别号），复盘会单独统计特别号命中率。
+`show` 命令会输出“6+1推荐单”格式，便于直接复制。
+
+## 命令说明
 ```bash
-cp .env.example .env
+python3 marksix_local.py bootstrap --csv <文件>
+python3 marksix_local.py sync --source official
+python3 marksix_local.py sync --source third_party --third-party-url "<第三方URL>"
+python3 marksix_local.py sync --source csv --csv <文件>
+python3 marksix_local.py sync --source auto --with-backtest
+python3 marksix_local.py --updata --source auto --third-party-url "<第三方URL1>" --third-party-url "<第三方URL2>"
+python3 marksix_local.py backtest --rebuild
+python3 marksix_local.py backtest --rebuild --remine --progress-every 50
+python3 marksix_local.py mine
+python3 marksix_local.py predict [--issue 26/023]
+python3 marksix_local.py review [--issue 26/022]
+python3 marksix_local.py show
 ```
 
-3. 初始化数据库
+官方源默认地址：
+`https://bet.hkjc.com/contentserver/jcbw/cmc/last30draw.json`
+
+数据源规则（默认 `--source auto`）：
+- 数据库为空时：用 `Mark_Six.csv` 做一次初始化
+- 数据库已有历史后：后续更新只走在线源（先官方，失败后自动尝试第三方）
+- 默认开启连续性检查：发现期号断档会直接失败并提示缺失期号样例（避免静默漏数据）
+- 如你确认数据源不完整但仍想继续更新，可加 `--no-require-continuity`
+
+规律挖掘引擎：
+- 新增策略：`规律挖掘 (pattern_mined_v1)`，自动从历史数据搜索窗口与权重参数
+- 新增策略：`集成投票 (ensemble_v2)`，融合热号/冷号/动量/组合/规律挖掘的排名投票
+- 可手动重挖掘：`python3 marksix_local.py mine`
+- 回测建议重建：`python3 marksix_local.py backtest --rebuild --remine`
+- 长回测建议加进度输出：`python3 marksix_local.py backtest --rebuild --remine --progress-every 50`
+- V3 覆盖池：每个策略同时输出 `6/10/14/20` 候选池并统计对应命中率
+
+第三方源格式支持：
+- JSON（常见字段：`issueNo/drawNo`、`date/drawDate`、`n1..n6`、`specialNumber`）
+- CSV（字段与 `Mark_Six.csv` 同类格式）
+
+内置第三方源（未传 `--third-party-url` 时自动使用）：
+- `https://lottolyzer.com/history/hong-kong/mark-six/page/1/per-page/50/summary-view`
+
+## 本地 Web 页面
 ```bash
-npx prisma generate
-npx prisma migrate dev --name init
+python3 web_app.py --host 127.0.0.1 --port 8080
 ```
+打开浏览器访问：
+- `http://127.0.0.1:8080/`（预测看板）
+- `http://127.0.0.1:8080/review`（复盘总览）
+- `http://127.0.0.1:8080/review?issue=26/022`（按期查看预测与准确率）
 
-4. 一次性导入历史数据（只需首次）
+首页每个策略卡片会同时显示 `6/10/14/20` 四档小型命中率对比条，无需切换参数。
+
+## 数据库
+- 默认数据库文件：`local_python/marksix_local.db`（按脚本所在目录固定）
+- 默认 CSV：`local_python/Mark_Six.csv`（按脚本所在目录固定）
+- 可通过 `--db`、`--csv` 自定义路径
+
+例如：
 ```bash
-npm run bootstrap:history
+python3 marksix_local.py --db ./data/local.db show
 ```
-
-5. 启动项目
-```bash
-npm run dev
-```
-
-## 生产环境建议（Vercel）
-- 使用外部 Postgres（Neon / Supabase / RDS），不要把 CSV 当线上数据库。
-- Vercel 只负责运行 Web/API/Cron，持久化数据放在 Postgres。
-- Vercel 环境变量至少配置：
-  - `DATABASE_URL`
-  - `CRON_SECRET`
-  - `RESULT_PROVIDER=official`（推荐）
-  - `OFFICIAL_RESULT_URL`（官方结果 JSON 地址）
-
-## 关键 API
-- `GET /api/jobs/sync-latest`
-  - 功能：同步最新开奖 + 对已开奖期做复盘 + 生成下一期预测
-  - 认证：支持 `Authorization: Bearer <CRON_SECRET>`（Vercel Cron）或 `x-cron-secret: <CRON_SECRET>`
-- `POST /api/predictions/generate`
-  - 功能：手动生成预测
-  - 请求体示例：
-```json
-{
-  "issueNo": "26/001",
-  "strategies": ["balanced_v1", "hot_v1"]
-}
-```
-
-## 数据源模式
-- `RESULT_PROVIDER=official`：优先读取官方结果源（推荐）
-- `RESULT_PROVIDER=csv`：读取 `RESULT_CSV_URL` 或本地 `LOCAL_RESULT_CSV_PATH`
-- 未设置 `RESULT_PROVIDER`：先尝试官方，再回退到 CSV
-
-官方模式建议变量：
-```env
-RESULT_PROVIDER=official
-OFFICIAL_RESULT_URL=https://bet.hkjc.com/contentserver/jcbw/cmc/last30draw.json
-OFFICIAL_SOURCE_REQUIRED=true
-```
-
-说明：
-- 官方地址可能调整，若解析失败可先把 `OFFICIAL_SOURCE_REQUIRED=false`，系统会自动回退 CSV。
-- 一旦你确认官方接口稳定，建议将 `OFFICIAL_SOURCE_REQUIRED=true`，避免 silently fallback。
-
-## 补充 2008 年前历史数据
-1. 准备 CSV 文件，放到 `data/history/`，例如：
-   - `data/history/1997.csv`
-   - `data/history/1998.csv`
-   - `data/history/2007.csv`
-2. CSV 至少包含列：
-   - `期号`
-   - `日期`
-   - `中奖号码`
-   - `特别号码`
-3. 执行补录（示例导入 1993-2007）：
-```bash
-npm run backfill:history -- --path ./data/history --from-year 1993 --to-year 2007
-```
-4. 跑质量检查：
-```bash
-npm run audit:history
-```
-5. 若审计通过，可重新生成下一期预测：
-```bash
-npm run predict:next
-```
-
-## 用 `Mark_Six.csv` 初始化当前库
-默认会读取根目录 `Mark_Six.csv`（可由 `LOCAL_RESULT_CSV_PATH` 覆盖）：
-```bash
-npm run bootstrap:history
-```
-如果之前已经初始化过，想用新 CSV 重新全量校正：
-```bash
-npm run bootstrap:history -- --force
-```
-
-## 部署到 Vercel Postgres 并自动增量
-1. 推送代码到 GitHub。
-2. 在 Vercel 导入仓库。
-3. 在 Vercel 项目中创建 Postgres（Storage -> Postgres），复制连接串到 `DATABASE_URL`。
-4. 在 Vercel 项目环境变量中设置：
-   - `DATABASE_URL`
-   - `CRON_SECRET`（自行生成高强度随机字符串）
-   - `RESULT_PROVIDER=official`
-   - `OFFICIAL_RESULT_URL`
-   - `OFFICIAL_SOURCE_REQUIRED=true`
-5. 在 Vercel 项目 `Build Command` 设置：
-```bash
-npm run vercel-build
-```
-6. 首次部署完成后，手动触发一次：
-   - 访问 `/api/jobs/sync-latest`（带 Bearer token）或在 Vercel Functions 页面触发该路由。
-7. 之后由 `vercel.json` 的 cron 自动触发增量同步。
-
-说明：
-- 自动增量的关键是：`OFFICIAL_RESULT_URL` 能持续返回最新开奖结果。
-- 如官方格式有变更，需同步更新解析逻辑（`src/lib/official-source.ts`）。
-
-## GitHub 上传与 Vercel 部署
-
-### 1) 推送到 GitHub
-```bash
-git init
-git add .
-git commit -m "feat: init marksix predictor v1 skeleton"
-# 替换为你的仓库地址
-git remote add origin git@github.com:<your-name>/<repo>.git
-git branch -M main
-git push -u origin main
-```
-
-### 2) 连接 Vercel
-1. 在 Vercel 导入该 GitHub 仓库
-2. 配置环境变量：
-   - `DATABASE_URL`
-   - `CRON_SECRET`
-   - `RESULT_PROVIDER`（推荐 `official`）
-   - `OFFICIAL_RESULT_URL`
-   - `OFFICIAL_SOURCE_REQUIRED`
-   - `RESULT_CSV_URL`（可选，回退源）
-   - `LOCAL_RESULT_CSV_PATH`（可选，本地调试）
-   - `HISTORY_CSV_DIR`（可选，本地补历史默认目录）
-3. 部署后，Vercel 会按 `vercel.json` 的 cron 触发增量同步
