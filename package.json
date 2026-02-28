@@ -1,0 +1,42 @@
+{
+  "name": "marksix-predictor",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=20 <21",
+    "npm": ">=10 <11"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "postinstall": "prisma generate",
+    "build": "next build",
+    "vercel-build": "prisma generate && prisma migrate deploy && next build",
+    "start": "next start",
+    "lint": "next lint",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "bootstrap:history": "tsx scripts/bootstrap-history.ts",
+    "backfill:history": "tsx scripts/backfill-history.ts",
+    "audit:history": "tsx scripts/audit-history.ts",
+    "predict:next": "tsx scripts/generate-prediction.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.6.0",
+    "csv-parse": "^5.5.6",
+    "date-fns": "^4.1.0",
+    "next": "15.3.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "eslint": "^9.22.0",
+    "eslint-config-next": "15.3.0",
+    "prisma": "^6.6.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3"
+  }
+}
