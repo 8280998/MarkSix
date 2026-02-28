@@ -154,8 +154,3 @@ git push -u origin main
    - `LOCAL_RESULT_CSV_PATH`（可选，本地调试）
    - `HISTORY_CSV_DIR`（可选，本地补历史默认目录）
 3. 部署后，Vercel 会按 `vercel.json` 的 cron 触发增量同步
-
-## 关于“要不要在 Codex 里设置 GitHub”
-- 不需要在 Codex 做特殊配置。
-- 你只需要本机已配置好 Git 凭据（SSH key 或 GitHub Token），然后在终端里按上面的 `git remote add` / `git push` 执行即可。
-- 如果你希望我继续，我可以下一步直接帮你整理 `.env`、执行本地初始化命令，并检查项目是否可运行。
