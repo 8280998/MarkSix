@@ -1,8 +1,0 @@
-{
-  "crons": [
-    {
-      "path": "/api/jobs/sync-latest",
-      "schedule": "0 12 * * 2,4,6"
-    }
-  ]
-}
